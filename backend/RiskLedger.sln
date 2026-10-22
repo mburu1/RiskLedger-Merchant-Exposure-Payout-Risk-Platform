@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RiskLedger.Domain", "src\RiskLedger.Domain\RiskLedger.Domain.csproj", "{E9B9DBA1-4A92-4A64-96D2-58E8F9000101}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RiskLedger.Application", "src\RiskLedger.Application\RiskLedger.Application.csproj", "{E9B9DBA1-4A92-4A64-96D2-58E8F9000102}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RiskLedger.Infrastructure", "src\RiskLedger.Infrastructure\RiskLedger.Infrastructure.csproj", "{E9B9DBA1-4A92-4A64-96D2-58E8F9000103}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RiskLedger.Api", "src\RiskLedger.Api\RiskLedger.Api.csproj", "{E9B9DBA1-4A92-4A64-96D2-58E8F9000104}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RiskLedger.UnitTests", "tests\RiskLedger.UnitTests\RiskLedger.UnitTests.csproj", "{E9B9DBA1-4A92-4A64-96D2-58E8F9000105}"
+EndProject
+Global
+ GlobalSection(SolutionConfigurationPlatforms) = preSolution
+  Debug|Any CPU = Debug|Any CPU
+  Release|Any CPU = Release|Any CPU
+ EndGlobalSection
+ GlobalSection(ProjectConfigurationPlatforms) = postSolution
+  {E9B9DBA1-4A92-4A64-96D2-58E8F9000101}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+  {E9B9DBA1-4A92-4A64-96D2-58E8F9000101}.Debug|Any CPU.Build.0 = Debug|Any CPU
+  {E9B9DBA1-4A92-4A64-96D2-58E8F9000102}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+  {E9B9DBA1-4A92-4A64-96D2-58E8F9000102}.Debug|Any CPU.Build.0 = Debug|Any CPU
+  {E9B9DBA1-4A92-4A64-96D2-58E8F9000103}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+  {E9B9DBA1-4A92-4A64-96D2-58E8F9000104}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+  {E9B9DBA1-4A92-4A64-96D2-58E8F9000105}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+  {E9B9DBA1-4A92-4A64-96D2-58E8F9000105}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ EndGlobalSection
+EndGlobal
