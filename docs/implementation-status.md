@@ -2,86 +2,67 @@
 
 Last reviewed: 2026-10-22
 
-This document distinguishes committed implementation evidence from the intended product roadmap. A commit existing is not proof that its code has passed a clean local build or CI run; verify the latest workflow before claiming a release-ready state.
+This document distinguishes committed implementation evidence from the intended product roadmap. The new domain components are pure policy/calculation helpers; they are not yet wired to authoritative database queries, transactional use cases, or API endpoints. A commit existing is not proof that its code has passed a clean build or CI run.
 
-## Completed foundation / in-progress vertical slice
+## Committed foundation
 
-- [x] Repository product framing and financial invariants are documented.
-- [x] Initial engineering conventions and CI workflow are present.
-- [x] .NET 10 solution and API foundation are present.
-- [x] Angular application shell, routing, and typed readiness view are present.
+- [x] Product framing, engineering conventions, ADRs and financial invariants are documented.
+- [x] .NET 10 solution/API and Angular application shell are present.
 - [x] PostgreSQL Compose configuration and EF Core/Npgsql integration are present.
-- [x] Liveness/readiness endpoints, development-only OpenAPI/Scalar, structured JSON logging, and Problem Details handling are present.
+- [x] Liveness/readiness endpoints, development-only OpenAPI/Scalar, JSON logging and Problem Details handling are present.
 - [x] Money/currency rules and double-entry journal validation are represented in the domain.
-- [x] Ledger account, journal posting, history, and compensating reversal API paths are present.
-- [x] A PostgreSQL ledger adapter has been wired into the API in the current source.
+- [x] Ledger account, journal posting, history and compensating reversal API paths are present.
+- [x] PostgreSQL ledger adapter is wired into the API.
+- [x] Pure deterministic exposure calculator with eligible-source ID tracking and duplicate/mixed-currency guards is present.
+- [x] Deterministic risk-policy evaluator with version and reason codes is present.
+- [x] Pure reserve requirement/releasable-amount calculation is present.
+- [x] Fail-closed payout eligibility helper and payout lifecycle transition rules are present.
+- [x] Pure simulated-statement reconciliation matcher detects missing, duplicate and mismatched records.
+- [x] backend/schema/platform.sql defines initial relational tables for organizers, verification, trips, bookings, obligations, disputes, exposure snapshots, policy versions, assessments, reserves, payouts, audit, outbox/inbox and reconciliation.
 
-## Must verify before treating the ledger slice as complete
+## Verification status — not yet release-ready
 
 - [ ] Run restore, Release build, and all tests from a clean checkout.
-- [ ] Confirm EF Core migrations exist and apply to an empty PostgreSQL database.
-- [ ] Confirm journal entry, journal lines, and idempotency key are committed atomically.
-- [ ] Confirm database uniqueness protects idempotency under concurrent requests and a reused key with a different payload is rejected.
-- [ ] Confirm posted journal rows cannot be modified/deleted through ordinary application paths.
-- [ ] Confirm reversal links, original-entry preservation, and transaction rollback behavior.
-- [ ] Run concurrent duplicate-posting and competing-posting tests against PostgreSQL/Testcontainers.
-- [ ] Verify current GitHub Actions workflow results for the latest main commit.
+- [ ] Confirm latest GitHub Actions runs pass for the latest main commit.
+- [ ] Apply both schema scripts to an empty PostgreSQL database and verify constraints/indexes.
+- [ ] Convert the platform schema into tracked EF Core migrations and map all platform entities.
+- [ ] Wire exposure calculations to persisted eligible records and persist immutable input snapshots.
+- [ ] Persist risk policy versions/assessments and add review/override APIs with authorization/audit.
+- [ ] Implement ledger-backed reserve movements, transactional holds and idempotent release commands.
+- [ ] Implement atomic payout reservation, idempotency conflict handling, and simulated provider adapter.
+- [ ] Add PostgreSQL/Testcontainers integration and concurrency tests for ledger, reserves, payouts and migrations.
+- [ ] Implement a transactional outbox publisher, RabbitMQ consumer, inbox deduplication, retry/dead-letter policy and worker recovery.
+- [ ] Wire reconciliation matcher to statement import, persisted findings, resolution workflow and API.
+- [ ] Build API-backed Angular operations workflows; the existing shell is not the completed operations console.
+- [ ] Add authentication, granular authorization, rate limiting, secure configuration, redaction and observability.
+- [ ] Add clean Compose/CI verification, dependency scanning, backup/restore and operational runbooks.
 
-## Remaining roadmap
+## Phase map
 
-### Phase 2 — Core domain persistence
-- Organizer, verification case, trip, booking, supplier obligation, and dispute models.
-- EF Core mappings, migrations, indexes, foreign keys, audit metadata, and concurrency policy.
-- Deterministic synthetic seed data and ERD.
+| Phase | Scope | Current state |
+|---|---|---|
+| P0 | Product framing, ADRs, conventions, CI foundation | Initial foundation committed; clean CI verification still required |
+| P1 | Runnable backend/frontend/PostgreSQL skeleton | Initial skeleton present; clean startup/build still needs verification |
+| P2 | Core domain persistence and migrations | SQL schema draft committed; EF mappings/migrations and APIs remain |
+| P3 | Double-entry ledger | Initial API/store/domain slice present; database concurrency and migration checks remain |
+| P4 | Exposure | Deterministic pure calculator committed; persisted-source integration remains |
+| P5 | Risk underwriting | Deterministic pure policy evaluator committed; persistence, review queue and authorization remain |
+| P6 | Reserves | Calculation helper committed; allocation/release workflows and ledger-backed movements remain |
+| P7 | Payouts | Eligibility and transition helpers committed; atomic reservation/provider/recovery integration remains |
+| P8 | Messaging/workers | Outbox/inbox schema present; publisher, broker, consumer and worker remain |
+| P9 | Operations console | Angular shell present; product workflows and frontend tests remain |
+| P10 | Reconciliation/security/reliability | Pure reconciliation matcher and schema committed; import/resolution/auth/observability remain |
 
-### Phase 4 — Exposure calculation
-- Obligation eligibility/lifecycle rules and settlement effects.
-- Versioned deterministic calculation snapshots and organizer/trip breakdowns.
-- Currency-safe totals, partial settlements, missing data, future dates, and duplicate-input tests.
+## Next implementation order
 
-### Phase 5 — Risk policy
-- Immutable policy versions, deterministic assessments, reason codes and canonical input snapshots.
-- Review queue, authorized override flow, and audit records.
-
-### Phase 6 — Reserves
-- Reserve policy versions, allocation/release lifecycle, ledger-backed movements and idempotency.
-- Reassessment triggers and race-condition coverage.
-
-### Phase 7 — Payouts
-- Eligibility checks based on authoritative settled funds, holds, reserves, verification, risk state and lifecycle.
-- Atomic funds commitment, idempotent payout requests, simulated provider success/decline/timeout/unknown outcomes.
-- Safe retry and reconciliation for ambiguous provider outcomes.
-
-### Phase 8 — Messaging and workers
-- Transactional outbox, RabbitMQ, idempotent/versioned consumers, bounded retries, dead-letter handling, worker recovery and metrics.
-
-### Phase 9 — Operations console
-- API-backed dashboard, organizer timeline, risk review, exposure, reserves, payouts, disputes, ledger and audit screens.
-- Server-side pagination/filtering, accessible loading/error/empty states and critical workflow tests.
-
-### Phase 10 — Security and reconciliation
-- Authentication and granular authorization for sensitive actions.
-- Simulated provider statement import, discrepancy lifecycle, rate limiting, secure configuration, redacted logs, metrics/traces/alerts, and recovery runbooks.
-
-### Phase 11 — Delivery hardening
-- Reliable lockfile-based frontend CI, lint/test/build, backend integration services, migration validation and dependency/security checks.
-- Container image build, clean Compose startup, graceful shutdown, load/concurrency measurements, backup/restore exercise and verified documentation.
-- Kubernetes remains deferred until local containerized behavior is stable.
-
-### Phase 12 — Optional advisory AI
-- Provider-neutral case-summary adapter with source references, minimized data, human review and evaluation tests.
-- AI must never post ledger entries or authorize payouts.
-
-## Recommended next implementation order
-
-1. Verify and harden the PostgreSQL ledger vertical slice and its migrations/concurrency tests.
-2. Implement Phase 2 domain persistence and deterministic seed data.
-3. Implement exposure calculations (Phase 4).
-4. Implement versioned risk assessments (Phase 5).
-5. Implement reserves before payouts (Phase 6, then Phase 7).
-6. Add outbox/workers, UI workflows, reconciliation/security, and delivery hardening.
-7. Consider advisory AI only after operational and authorization boundaries are established.
+1. Validate/fix build and tests against a clean checkout and inspect CI results.
+2. Introduce EF Core migrations and persistence mappings for the new platform schema.
+3. Implement persisted organizer/trip/booking/obligation/verification/dispute use cases and deterministic synthetic seed data.
+4. Wire exposure and risk use cases to persisted source-of-truth data.
+5. Add transactional reserve and payout workflows with PostgreSQL concurrency tests.
+6. Implement outbox/RabbitMQ workers and provider reconciliation.
+7. Finish authorization, operations console, observability, security and delivery hardening.
 
 ## Release boundary
 
-RiskLedger remains an educational simulation. It is not a production financial platform, does not move real money, and must use synthetic data and simulated providers. Do not describe the project as complete until the roadmap acceptance criteria and clean-checkout verification are satisfied.
+RiskLedger remains an educational simulation. It is not a production financial platform, does not move real money, and must use synthetic data and simulated providers. The pure helpers are not a substitute for transactional enforcement in the database/application layer. Do not describe the project as complete until all phase acceptance criteria and clean-checkout verification pass.
