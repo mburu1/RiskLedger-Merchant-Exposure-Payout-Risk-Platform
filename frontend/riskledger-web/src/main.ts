@@ -1,6 +1,6 @@
 import { provideHttpClient, HttpClient } from '@angular/common/http';
 import { bootstrapApplication } from '@angular/platform-browser';
-import { provideRouter, RouterLink, RouterOutlet, Routes } from '@angular/router';
+import { provideRouter, RouterLink, RouterLinkActive, RouterOutlet, Routes } from '@angular/router';
 import { Component, Injectable, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { catchError, of, timeout } from 'rxjs';
@@ -77,7 +77,7 @@ class HomeComponent {}
 @Component({
   selector: 'rl-root',
   standalone: true,
-  imports: [RouterLink, RouterOutlet],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet],
   template: `
     <main class="shell">
       <header class="topbar">
