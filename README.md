@@ -1,42 +1,66 @@
 # RiskLedger — Merchant Exposure & Payout Risk Platform
 
-A portfolio-grade financial risk engineering simulation built with C# / ASP.NET Core 10, Angular / TypeScript, and PostgreSQL as the planned durable source of truth.
+A portfolio-grade financial risk engineering simulation built with C# / ASP.NET Core 10, Angular / TypeScript, and PostgreSQL.
 
-> Simulation only: no real money movement, live payment rails, or production underwriting. Synthetic data only.
+> **Simulation only:** no real money movement, live payment rails, production underwriting, real KYC data, or real provider credentials. Use synthetic data and simulated providers only.
 
-## Implemented first slice
+## Current implementation
 
-- .NET 10 modular solution: Domain, Application, Infrastructure, API and unit tests.
-- Currency-aware Money value object using decimal, explicit supported currencies, currency-specific minor-unit precision, rejection of excess input precision, and explicit midpoint-to-even rounding.
+The repository has an initial engineering foundation and a first ledger vertical slice:
+
+- .NET 10 solution with Domain, Application, Infrastructure, API, and unit-test projects.
+- Currency-aware `Money` value object using `decimal`, explicit supported-currency scale, input precision validation, and explicit midpoint-to-even rounding.
 - Double-entry journal validation that balances each currency independently.
-- Compensating journal reversal factory that preserves the original posted entry.
-- Idempotent ledger posting behavior in a process-local development adapter.
-- ASP.NET Core liveness/readiness probes (readiness checks PostgreSQL connectivity), OpenAPI + Scalar in Development, centralized Problem Details exception handling, JSON structured logs, and ledger demo POST/history GET.
-- Angular operations landing screen.
-- PostgreSQL Compose service and EF Core/Npgsql persistence boundary; the demo ledger is still in-memory until the durable ledger phase.
+- Ledger account, journal posting, history, and compensating reversal API paths.
+- PostgreSQL/EF Core/Npgsql integration and a PostgreSQL ledger adapter wired into the API.
+- Liveness/readiness probes, development-only OpenAPI + Scalar, structured JSON logging, and centralized Problem Details exception handling.
+- Angular operations shell, feature routing, and typed readiness view.
+- Docker Compose PostgreSQL configuration and initial CI workflow.
 
-**Important limitation:** the ledger is currently held in memory and is lost when the API restarts. The API is wired to PostgreSQL through EF Core/Npgsql for readiness checks. Ledger entries remain in memory, so the adapter cannot provide cross-process idempotency, transactional durability, restart recovery, or database-enforced immutability. This is not durable accounting storage.
+This is an **in-progress implementation**, not a finished financial platform. The existence of a PostgreSQL adapter does not by itself prove migration correctness, atomic idempotency, concurrency safety, immutability, or recovery. Those guarantees must be demonstrated by database-backed tests and clean-checkout verification.
 
-## Financial invariants (normative)
+See [the implementation status and remaining roadmap](docs/implementation-status.md) for the current completion boundary and outstanding phases. The financial rules in [the domain invariants](docs/domain/invariants.md) are normative.
 
-Read [docs/domain/invariants.md](docs/domain/invariants.md) before designing database tables or implementing exposure, reserves, risk decisions, or payouts. [ADR-0003](docs/architecture/decisions/ADR-0003-financial-invariants.md) records the decisions.
+## Financial invariants
 
-The current currency catalogue is KES, USD, EUR and GBP (2 decimal places), JPY (0), and KWD (3). Unknown currencies and inputs with excess fractional precision are rejected. Calculated values that require rounding must call the explicit rounding operation, which uses midpoint-to-even.
-
-Journal entries must balance independently for every currency. Corrections are compensating entries; the original remains unchanged. Exposure, reserve requirements and available payout balance are separate measures. Pending funds are not payout-available by default. Payout eligibility must check verification, authoritative settled funds, reserves/holds, current risk restrictions, lifecycle and idempotency—not merely a risk score.
+- Money uses `decimal`; currencies are explicit and never implicitly combined or converted.
+- The current currency catalogue is KES, USD, EUR, GBP (2 minor-unit digits), JPY (0), and KWD (3).
+- Each journal entry balances independently for every currency.
+- Posted entries are immutable through ordinary commands; corrections use linked compensating entries.
+- Posting idempotency must be enforced transactionally in durable storage; a key reused for a different request must be rejected.
+- Gross obligations, covered exposure, required reserves, and available payout balance are distinct measures.
+- Pending funds are not payout-available by default.
+- Payout eligibility must evaluate authoritative settled funds, holds/reserves, verification, current risk restrictions, lifecycle, and idempotency—not merely a risk score.
+- Ambiguous provider outcomes must be reconciled before retry; never blindly initiate a duplicate transfer.
 
 ## Run locally (PowerShell)
 
-Prerequisites: .NET 10 SDK, Node.js 22+, npm, Docker Desktop with Compose.
+Prerequisites: .NET 10 SDK, Node.js 22+, npm, and Docker Desktop with Compose.
+
+From the repository root:
 
 ```powershell
 dotnet restore .\backend\RiskLedger.sln
-dotnet build .\backend\RiskLedger.sln
-dotnet test .\backend\RiskLedger.sln
+dotnet build .\backend\RiskLedger.sln --configuration Release
+dotnet test .\backend\RiskLedger.sln --configuration Release
+```
+
+Start PostgreSQL:
+
+```powershell
+Copy-Item .env.example .env
+docker compose --env-file .env -f .\infrastructure\compose\compose.yaml up -d
+docker compose --env-file .env -f .\infrastructure\compose\compose.yaml ps
+```
+
+Start the API in a separate terminal:
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = "Development"
 dotnet run --project .\backend\src\RiskLedger.Api\RiskLedger.Api.csproj --urls http://localhost:5080
 ```
 
-In another terminal:
+Start the frontend in another terminal:
 
 ```powershell
 Set-Location .\frontend\riskledger-web
@@ -44,9 +68,20 @@ npm install
 npm start
 ```
 
-API: http://localhost:5080. Angular: http://localhost:4200. Health: /health/live and /health/ready. Scalar UI: /scalar/v1. OpenAPI JSON: /openapi/v1.json in Development. Set `ASPNETCORE_ENVIRONMENT=Development` to enable the documentation UI.
+Default local endpoints:
 
-## Create a synthetic KES posting
+- API: `http://localhost:5080`
+- Angular: `http://localhost:4200`
+- Liveness: `/health/live`
+- Readiness: `/health/ready`
+- Scalar: `/scalar/v1` (Development only)
+- OpenAPI: `/openapi/v1.json` (Development only)
+
+Configure `window.__RISKLEDGER_API_URL__` before frontend bootstrap when the API is hosted elsewhere. The local database credentials are for isolated development only; never commit real secrets.
+
+## Create a synthetic ledger posting
+
+Use the demo endpoint only with synthetic data:
 
 ```powershell
 $body = @{ idempotencyKey = "demo-booking-001"; amount = 10000; currency = "KES" } | ConvertTo-Json
@@ -54,19 +89,11 @@ Invoke-RestMethod -Method Post -Uri http://localhost:5080/api/v1/ledger/demo-pos
 Invoke-RestMethod -Uri http://localhost:5080/api/v1/ledger/entries
 ```
 
-## PostgreSQL local service
+## Roadmap
 
-```powershell
-Copy-Item .env.example .env
-docker compose --env-file .env -f .\infrastructure\compose\compose.yaml up -d
-docker compose -f .\infrastructure\compose\compose.yaml ps
-```
+The intended phases cover core domain persistence; exposure calculations; versioned risk decisions; reserve management; payout eligibility and a simulated provider; transactional outbox/RabbitMQ and workers; Angular operations workflows; reconciliation and security; delivery hardening; and optional advisory AI. Phase completion requires behavior, tests, documentation, and verification—not just folders or scaffolding.
 
-The API checks PostgreSQL connectivity for readiness and registers EF Core/Npgsql. Ledger entries are still held in memory: PostgreSQL persistence, migrations, and durable idempotency are not yet implemented. The default password is for isolated local development only; never commit real secrets.
-
-## Phase 1 verification notes\n\n- API liveness is independent of dependencies; readiness returns unhealthy when PostgreSQL is unreachable.\n- Scalar and OpenAPI are exposed in Development only.\n- The frontend includes feature routing and a typed health client that reads `/health/ready`; configure `window.__RISKLEDGER_API_URL__` before bootstrapping when the API is hosted elsewhere.\n- The current frontend `lint` script performs TypeScript static type checking; a dedicated ESLint configuration and lockfile-backed CI workflow remain follow-up work.\n- EF Core is registered against PostgreSQL, but no schema migrations or durable ledger persistence exist yet. Do not describe the ledger as durable.\n\n## Phase 1 verification notes\n\n- Liveness is independent of dependencies; readiness returns unhealthy when PostgreSQL cannot be reached.\n- Scalar and OpenAPI are exposed in Development only.\n- The Angular shell includes feature routing and a typed readiness client. Configure `window.__RISKLEDGER_API_URL__` before bootstrap when the API is hosted elsewhere.\n- The frontend `lint` script currently performs TypeScript static type checking; a dedicated ESLint configuration and lockfile-backed CI workflow remain follow-up work.\n- EF Core is registered against PostgreSQL, but no schema migrations or durable ledger persistence exist yet.\n\n## Next critical milestone
-
-Implement PostgreSQL-backed atomic journal posting, migrations, unique idempotency constraints, concurrency tests, durable compensating-entry workflow and recovery. Then build organizer/booking obligations and reproducible exposure calculations before reserves or payouts.
+The immediate priority is to verify PostgreSQL migrations and atomic/idempotent ledger posting under concurrency, then implement organizer/booking/supplier-obligation persistence and deterministic exposure calculations. Do not treat reserves or payouts as complete until the ledger and exposure foundations meet their acceptance criteria.
 
 ## License
 
