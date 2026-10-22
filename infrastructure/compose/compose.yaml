@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: riskledger-postgres
+    environment:
+      POSTGRES_DB: riskledger
+      POSTGRES_USER: riskledger
+      POSTGRES_PASSWORD: ${RISKLEDGER_DB_PASSWORD:-local-only-change-me}
+    ports:
+      - "5432:5432"
+    volumes:
+      - riskledger-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U riskledger -d riskledger"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+volumes:
+  riskledger-postgres-data:
