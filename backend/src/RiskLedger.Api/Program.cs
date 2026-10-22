@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using RiskLedger.Application.Ledger;
 using RiskLedger.Domain;
 using RiskLedger.Domain.Ledger;
-using RiskLedger.Infrastructure;
 using RiskLedger.Infrastructure.Ledger;
 using Scalar.AspNetCore;
 
@@ -12,13 +14,13 @@ builder.Logging.AddJsonConsole();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ProblemDetailsExceptionHandler>();
 builder.Services.AddOpenApi();
-builder.Services.AddOptions<DatabaseOptions>()
-    .Bind(builder.Configuration.GetSection(DatabaseOptions.SectionName))
-    .Validate(o => !string.IsNullOrWhiteSpace(o.ConnectionString), "Database:ConnectionString is required.")
-    .ValidateOnStart();
 
 var connectionString = builder.Configuration["Database:ConnectionString"]
-    ?? "Host=localhost;Port=5432;Database=riskledger;Username=riskledger;Password=local-only-change-me";
+    ?? "Host=localhost;Port=5432;Database=riskledger;Username=riskledger;Password=local-only-change-me;Timeout=3;Command Timeout=5";
+builder.Services.AddOptions<DatabaseOptions>()
+    .Configure(options => options.ConnectionString = connectionString)
+    .Validate(options => !string.IsNullOrWhiteSpace(options.ConnectionString), "Database:ConnectionString is required.")
+    .ValidateOnStart();
 builder.Services.AddDbContext<RiskLedgerDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.AddHealthChecks().AddCheck<DatabaseReadinessCheck>("postgres", tags: ["ready"]);
 builder.Services.AddSingleton<ILedgerStore, InMemoryLedgerStore>();
@@ -67,3 +69,44 @@ static object ToResponse(JournalEntry entry) => new
     lines = entry.Lines.Select(x => new { x.AccountCode, debit = x.Debit.Amount, credit = x.Credit.Amount, currency = x.Debit.Currency })
 };
 public sealed record DemoPostingRequest(string IdempotencyKey, decimal Amount, string Currency);
+
+public sealed class DatabaseOptions
+{
+    public string ConnectionString { get; set; } = string.Empty;
+}
+
+public sealed class RiskLedgerDbContext(DbContextOptions<RiskLedgerDbContext> options) : DbContext(options);
+
+public sealed class DatabaseReadinessCheck(RiskLedgerDbContext dbContext) : IHealthCheck
+{
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await dbContext.Database.CanConnectAsync(cancellationToken)
+                ? HealthCheckResult.Healthy("PostgreSQL accepts connections.")
+                : HealthCheckResult.Unhealthy("PostgreSQL is not accepting connections.");
+        }
+        catch (Exception)
+        {
+            return HealthCheckResult.Unhealthy("PostgreSQL readiness check failed.");
+        }
+    }
+}
+
+public sealed class ProblemDetailsExceptionHandler(ILogger<ProblemDetailsExceptionHandler> logger) : IExceptionHandler
+{
+    public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
+    {
+        logger.LogError(exception, "Unhandled request failure. TraceId: {TraceId}", httpContext.TraceIdentifier);
+        httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        await httpContext.Response.WriteAsJsonAsync(new ProblemDetails
+        {
+            Status = StatusCodes.Status500InternalServerError,
+            Title = "An unexpected error occurred.",
+            Detail = "The request could not be completed. Use the trace identifier when contacting support.",
+            Extensions = { ["traceId"] = httpContext.TraceIdentifier }
+        }, cancellationToken);
+        return true;
+    }
+}
