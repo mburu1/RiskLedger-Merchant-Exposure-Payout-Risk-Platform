@@ -75,7 +75,9 @@ public sealed class DatabaseOptions
     public string ConnectionString { get; set; } = string.Empty;
 }
 
-public sealed class RiskLedgerDbContext(DbContextOptions<RiskLedgerDbContext> options) : DbContext(options);
+public sealed class RiskLedgerDbContext(DbContextOptions<RiskLedgerDbContext> options) : DbContext(options)
+{
+}
 
 public sealed class DatabaseReadinessCheck(RiskLedgerDbContext dbContext) : IHealthCheck
 {
