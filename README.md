@@ -5,16 +5,28 @@ A portfolio-grade financial risk engineering simulation built with C# / ASP.NET 
 > Simulation only: no real money movement, live payment rails, or production underwriting. Synthetic data only.
 
 ## Implemented first slice
+
 - .NET 10 modular solution: Domain, Application, Infrastructure, API and unit tests.
-- Currency-aware Money and double-entry journal validation.
+- Currency-aware Money value object using decimal, explicit supported currencies, currency-specific minor-unit precision, rejection of excess input precision, and explicit midpoint-to-even rounding.
+- Double-entry journal validation that balances each currency independently.
+- Compensating journal reversal factory that preserves the original posted entry.
 - Idempotent ledger posting behavior in a process-local development adapter.
 - ASP.NET Core health probes, OpenAPI in Development, ledger demo POST and ledger history GET.
 - Angular operations landing screen.
 - PostgreSQL Compose service, build conventions and GitHub Actions CI.
 
-**Important limitation:** the ledger is currently held in memory and is lost when the API restarts. PostgreSQL is provisioned but not yet wired into the API. This is not durable accounting storage.
+**Important limitation:** the ledger is currently held in memory and is lost when the API restarts. PostgreSQL is provisioned but not yet wired into the API. The in-memory adapter cannot provide cross-process idempotency, transactional durability, restart recovery, or database-enforced immutability. This is not durable accounting storage.
+
+## Financial invariants (normative)
+
+Read [docs/domain/invariants.md](docs/domain/invariants.md) before designing database tables or implementing exposure, reserves, risk decisions, or payouts. [ADR-0003](docs/architecture/decisions/ADR-0003-financial-invariants.md) records the decisions.
+
+The current currency catalogue is KES, USD, EUR and GBP (2 decimal places), JPY (0), and KWD (3). Unknown currencies and inputs with excess fractional precision are rejected. Calculated values that require rounding must call the explicit rounding operation, which uses midpoint-to-even.
+
+Journal entries must balance independently for every currency. Corrections are compensating entries; the original remains unchanged. Exposure, reserve requirements and available payout balance are separate measures. Pending funds are not payout-available by default. Payout eligibility must check verification, authoritative settled funds, reserves/holds, current risk restrictions, lifecycle and idempotency—not merely a risk score.
 
 ## Run locally (PowerShell)
+
 Prerequisites: .NET 10 SDK, Node.js 22+, npm, Docker Desktop with Compose.
 
 ```powershell
@@ -53,6 +65,9 @@ docker compose -f .\infrastructure\compose\compose.yaml ps
 The API does not yet connect to PostgreSQL. Change the example password for anything beyond isolated local development; never commit secrets.
 
 ## Next critical milestone
-Replace the in-memory adapter with PostgreSQL-backed atomic journal posting, migrations, unique idempotency constraints, concurrency tests and compensating-entry reversals. Then build organizer/booking obligations and explainable exposure before reserves or payouts.
 
-See [RiskLedger_README.md](RiskLedger_README.md) for the full product vision and phased delivery plan.
+Implement PostgreSQL-backed atomic journal posting, migrations, unique idempotency constraints, concurrency tests, durable compensating-entry workflow and recovery. Then build organizer/booking obligations and reproducible exposure calculations before reserves or payouts.
+
+## License
+
+See the repository license file for reuse terms.
