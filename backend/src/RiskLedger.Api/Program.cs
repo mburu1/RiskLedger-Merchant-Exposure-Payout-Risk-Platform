@@ -28,14 +28,20 @@ app.MapPost("/api/v1/ledger/demo-posting", async (DemoPostingRequest request, Le
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["idempotencyKey"] = ["An idempotency key is required."] });
     if (string.IsNullOrWhiteSpace(request.Currency) || request.Currency.Length != 3 || !request.Currency.All(char.IsAsciiLetter))
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["currency"] = ["Currency must be a three-letter code."] });
+    if (!CurrencyCatalog.IsSupported(request.Currency))
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["currency"] = [$"Currency '{request.Currency.ToUpperInvariant()}' is not supported."] });
     if (request.Amount <= 0)
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["amount"] = ["Amount must be greater than zero."] });
+
+    var minorUnits = CurrencyCatalog.GetMinorUnits(request.Currency);
+    if (decimal.Round(request.Amount, minorUnits, MidpointRounding.ToEven) != request.Amount)
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["amount"] = [$"Amount has more than {minorUnits} minor-unit digits for {request.Currency.ToUpperInvariant()}."] });
 
     var amount = new Money(request.Amount, request.Currency);
     var lines = new[]
     {
-        JournalLine.Create("1000-PROCESSOR-CLEARING", amount, new Money(0, amount.Currency)),
-        JournalLine.Create("2000-MERCHANT-FUNDS-PAYABLE", new Money(0, amount.Currency), amount)
+        JournalLine.Create("1000-PROCESSOR-CLEARING", amount, new Money(0m, amount.Currency)),
+        JournalLine.Create("2000-MERCHANT-FUNDS-PAYABLE", new Money(0m, amount.Currency), amount)
     };
     var entry = await ledger.PostAsync(request.IdempotencyKey, "Synthetic booking funds received", lines, ct);
     return Results.Ok(ToResponse(entry));
@@ -44,7 +50,7 @@ app.Run();
 
 static object ToResponse(JournalEntry entry) => new
 {
-    entry.Id, entry.IdempotencyKey, entry.Description, entry.PostedAt,
+    entry.Id, entry.IdempotencyKey, entry.Description, entry.PostedAt, entry.ReversalOfEntryId,
     currency = entry.Lines[0].Debit.Currency,
     debitTotal = entry.Lines.Sum(x => x.Debit.Amount),
     creditTotal = entry.Lines.Sum(x => x.Credit.Amount),
