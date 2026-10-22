@@ -11,9 +11,9 @@ A portfolio-grade financial risk engineering simulation built with C# / ASP.NET 
 - Double-entry journal validation that balances each currency independently.
 - Compensating journal reversal factory that preserves the original posted entry.
 - Idempotent ledger posting behavior in a process-local development adapter.
-- ASP.NET Core health probes, OpenAPI in Development, ledger demo POST and ledger history GET.
+- ASP.NET Core liveness/readiness probes (readiness checks PostgreSQL connectivity), OpenAPI + Scalar in Development, centralized Problem Details exception handling, JSON structured logs, and ledger demo POST/history GET.
 - Angular operations landing screen.
-- PostgreSQL Compose service, build conventions and GitHub Actions CI.
+- PostgreSQL Compose service and EF Core/Npgsql persistence boundary; the demo ledger is still in-memory until the durable ledger phase.
 
 **Important limitation:** the ledger is currently held in memory and is lost when the API restarts. PostgreSQL is provisioned but not yet wired into the API. The in-memory adapter cannot provide cross-process idempotency, transactional durability, restart recovery, or database-enforced immutability. This is not durable accounting storage.
 
@@ -44,7 +44,7 @@ npm install
 npm start
 ```
 
-API: http://localhost:5080. Angular: http://localhost:4200. Health: /health/live and /health/ready. OpenAPI: /openapi/v1.json in Development.
+API: http://localhost:5080. Angular: http://localhost:4200. Health: /health/live and /health/ready. Scalar UI: /scalar/v1. OpenAPI JSON: /openapi/v1.json in Development. Set `ASPNETCORE_ENVIRONMENT=Development` to enable the documentation UI.
 
 ## Create a synthetic KES posting
 
@@ -62,9 +62,9 @@ docker compose --env-file .env -f .\infrastructure\compose\compose.yaml up -d
 docker compose -f .\infrastructure\compose\compose.yaml ps
 ```
 
-The API does not yet connect to PostgreSQL. Change the example password for anything beyond isolated local development; never commit secrets.
+The API checks PostgreSQL connectivity for readiness and registers EF Core/Npgsql. Ledger entries are still held in memory: PostgreSQL persistence, migrations, and durable idempotency are not yet implemented. The default password is for isolated local development only; never commit real secrets.
 
-## Next critical milestone
+## Phase 1 verification notes\n\n- API liveness is independent of dependencies; readiness returns unhealthy when PostgreSQL is unreachable.\n- Scalar and OpenAPI are exposed in Development only.\n- The frontend includes feature routing and a typed health client that reads `/health/ready`; configure `window.__RISKLEDGER_API_URL__` before bootstrapping when the API is hosted elsewhere.\n- The current frontend `lint` script performs TypeScript static type checking; a dedicated ESLint configuration and lockfile-backed CI workflow remain follow-up work.\n- EF Core is registered against PostgreSQL, but no schema migrations or durable ledger persistence exist yet. Do not describe the ledger as durable.\n\n## Next critical milestone
 
 Implement PostgreSQL-backed atomic journal posting, migrations, unique idempotency constraints, concurrency tests, durable compensating-entry workflow and recovery. Then build organizer/booking obligations and reproducible exposure calculations before reserves or payouts.
 
