@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><ProjectReference Include="..\RiskLedger.Application\RiskLedger.Application.csproj" /><ProjectReference Include="..\RiskLedger.Domain\RiskLedger.Domain.csproj" /></ItemGroup></Project>
