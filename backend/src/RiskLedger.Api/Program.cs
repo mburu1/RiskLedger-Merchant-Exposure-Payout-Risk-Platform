@@ -31,12 +31,12 @@ app.UseExceptionHandler();
 app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = _ => false,
-    ResponseWriter = WriteHealthResponse
+    ResponseWriter = HealthResponseWriter.WriteAsync
 });
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
-    ResponseWriter = WriteHealthResponse
+    ResponseWriter = HealthResponseWriter.WriteAsync
 });
 if (app.Environment.IsDevelopment())
 {
@@ -122,8 +122,10 @@ public sealed class ProblemDetailsExceptionHandler(ILogger<ProblemDetailsExcepti
 }
 
 
-static Task WriteHealthResponse(HttpContext context, Microsoft.Extensions.Diagnostics.HealthChecks.HealthReport report)
+public static class HealthResponseWriter
 {
+    public static Task WriteAsync(HttpContext context, Microsoft.Extensions.Diagnostics.HealthChecks.HealthReport report)
+    {
     context.Response.ContentType = "application/json";
     return context.Response.WriteAsJsonAsync(new
     {
@@ -132,4 +134,5 @@ static Task WriteHealthResponse(HttpContext context, Microsoft.Extensions.Diagno
             entry => entry.Key,
             entry => new { status = entry.Value.Status.ToString(), description = entry.Value.Description })
     });
+    }
 }
