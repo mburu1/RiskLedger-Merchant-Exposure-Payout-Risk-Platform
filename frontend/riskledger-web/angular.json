@@ -1,0 +1,7 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json", "version": 1, "newProjectRoot": "projects",
+  "projects": { "riskledger-web": { "projectType": "application", "root": "", "sourceRoot": "src", "prefix": "rl", "architect": { "build": {
+    "builder": "@angular/build:application", "options": { "outputPath": "dist/riskledger-web", "index": "src/index.html", "browser": "src/main.ts", "polyfills": ["zone.js"], "tsConfig": "tsconfig.app.json", "styles": ["src/styles.css"] },
+    "configurations": { "production": { "budgets": [{ "type": "initial", "maximumWarning": "1mb", "maximumError": "2mb" }], "outputHashing": "all" } }, "defaultConfiguration": "production"
+  } } } }
+}
