@@ -39,9 +39,7 @@ public sealed record RiskAssessment(
     Money UncoveredExposure,
     DateTimeOffset AssessedAt);
 
-/// <summary>
-/// Deterministic policy evaluation. No score or AI output can override these explicit rules.
-/// </summary>
+/// <summary>Deterministic policy evaluation; no score or AI output can override explicit rules.</summary>
 public static class RiskPolicyEvaluator
 {
     public static RiskAssessment Evaluate(RiskPolicy policy, RiskAssessmentInput input)
@@ -50,6 +48,9 @@ public static class RiskPolicyEvaluator
         ArgumentNullException.ThrowIfNull(input);
         policy.Validate();
         ArgumentException.ThrowIfNullOrWhiteSpace(input.OrganizerId);
+        ArgumentNullException.ThrowIfNull(input.UncoveredExposure);
+        if (input.UncoveredExposure.Amount < 0m)
+            throw new ArgumentOutOfRangeException(nameof(input), "Uncovered exposure cannot be negative.");
 
         var reasons = new List<string>();
         var outcome = RiskOutcome.Approve;
@@ -67,7 +68,7 @@ public static class RiskPolicyEvaluator
         }
 
         var exposure = input.UncoveredExposure.Amount;
-        if (exposure >= policy.RestrictExposureThreshold && policy.RestrictExposureThreshold > 0m)
+        if (exposure >= policy.RestrictExposureThreshold)
         {
             outcome = RiskOutcome.Restrict;
             reasons.Add("EXPOSURE_ABOVE_RESTRICT_THRESHOLD");
