@@ -28,8 +28,16 @@ builder.Services.AddScoped<LedgerPostingService>();
 
 var app = builder.Build();
 app.UseExceptionHandler();
-app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = _ => false });
-app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false,
+    ResponseWriter = WriteHealthResponse
+});
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthResponse
+});
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -111,4 +119,17 @@ public sealed class ProblemDetailsExceptionHandler(ILogger<ProblemDetailsExcepti
         }, cancellationToken);
         return true;
     }
+}
+
+
+static Task WriteHealthResponse(HttpContext context, Microsoft.Extensions.Diagnostics.HealthChecks.HealthReport report)
+{
+    context.Response.ContentType = "application/json";
+    return context.Response.WriteAsJsonAsync(new
+    {
+        status = report.Status.ToString(),
+        entries = report.Entries.ToDictionary(
+            entry => entry.Key,
+            entry => new { status = entry.Value.Status.ToString(), description = entry.Value.Description })
+    });
 }
