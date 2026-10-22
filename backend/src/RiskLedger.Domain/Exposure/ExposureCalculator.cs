@@ -3,8 +3,8 @@ using RiskLedger.Domain;
 namespace RiskLedger.Domain.Exposure;
 
 /// <summary>
-/// A versioned, deterministic exposure calculation over a caller-supplied point-in-time
-/// snapshot. This class does not fetch data or decide which source records are eligible.
+/// Versioned deterministic calculation over a caller-supplied point-in-time snapshot.
+/// This component does not fetch data or determine eligibility.
 /// </summary>
 public static class ExposureCalculator
 {
@@ -22,6 +22,11 @@ public static class ExposureCalculator
 
         var obligationRows = obligations.ToArray();
         var fundsRows = eligibleFunds.ToArray();
+        if (obligationRows.Length + fundsRows.Length == 0)
+            throw new ArgumentException("At least one source input is required to establish the calculation currency.");
+
+        if (obligationRows.Any(x => x.Amount is null) || fundsRows.Any(x => x.Amount is null))
+            throw new ArgumentException("Exposure inputs must include an amount.");
 
         EnsureUniqueIds(obligationRows.Select(x => x.Id), "supplier obligation");
         EnsureUniqueIds(fundsRows.Select(x => x.Id), "eligible funds");
@@ -31,10 +36,10 @@ public static class ExposureCalculator
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-        if (allCurrencies.Length > 1)
+        if (allCurrencies.Length != 1)
             throw new InvalidOperationException("Exposure inputs must be normalized to one currency before calculation.");
 
-        var currency = allCurrencies.SingleOrDefault() ?? "KES";
+        var currency = allCurrencies[0];
         if (obligationRows.Any(x => x.Amount.Amount < 0m) || fundsRows.Any(x => x.Amount.Amount < 0m))
             throw new ArgumentOutOfRangeException(nameof(obligations), "Exposure inputs cannot contain negative amounts.");
 
